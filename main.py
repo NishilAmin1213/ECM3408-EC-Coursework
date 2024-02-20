@@ -7,8 +7,7 @@ import requests
 
 '''
 NOTES
-- CORRECT RETURN CODES ACCORDING TO SPEC
-
+- CHECK RETURN CODES LOOKING AT SPEC
 - do we need to empty firebase at the beginning or will it already be empty
 '''
 
@@ -36,9 +35,6 @@ def update_cell(cell):
         # the formula must not be blank
         # both 'id' and 'formula' should be valid keys in 'input_json'
         try:
-            print(input_json['id'])
-            print(url_cell)
-            print(input_json['formula'])
             return (validate_cell_input(input_json['id']) and
                     url_cell == input_json['id'] and
                     len(input_json['formula']) > 0)
@@ -107,7 +103,6 @@ def read_cell(cell):
         return Response(status=404)
 
     try:
-
         if storage_method == 'sqlite':
             cursor = connection.cursor()
 
@@ -221,55 +216,6 @@ def clear_firebase():
         delete_cell(cell)
 
 
-def test_firebase():
-    # working firebase PUT request
-    # structure URL+/{CELL}.json json={"formula": "10"}
-    # ALL IN THE SAME REQUEST THE BELOW OCCURS
-    # if cells 'table' does not exist, firebase creates it
-    # if the cell A1 does not exist, firebase creates it
-    # if the cell A1 exists, firebase updates the formula
-
-    clear_firebase()
-
-    data = {"id": "A1", "formula": "4"}
-    response = requests.put(
-        url="https://" + db_name + "-default-rtdb.europe-west1.firebasedatabase.app/cells/" + data['id'] + ".json",
-        json={"formula": data['formula']})
-
-    data = {"id": "A2", "formula": "4"}
-    response = requests.put(
-        url="https://" + db_name + "-default-rtdb.europe-west1.firebasedatabase.app/cells/" + data['id'] + ".json",
-        json={"formula": data['formula']})
-
-    data = {"id": "A1", "formula": "8"}
-    response = requests.put(
-        url="https://" + db_name + "-default-rtdb.europe-west1.firebasedatabase.app/cells/" + data['id'] + ".json",
-        json={"formula": data['formula']})
-
-    print(get_cells())
-
-    data = {"id": "A1"}
-    response = requests.delete(
-        url="https://" + db_name + "-default-rtdb.europe-west1.firebasedatabase.app/cells/" + data['id'] + ".json")
-    print(response.status_code)
-
-    cell = 'A2'
-    response = requests.get(
-        url="https://" + db_name + "-default-rtdb.europe-west1.firebasedatabase.app/cells/" + cell + ".json")
-    if response.json() == None:
-        # cell does not exist
-        pass
-    else:
-        # cell exists and json contains the formula
-        value = response.json()['formula']
-        print(value)
-    print(response.json())
-
-    print(get_cells())
-
-    quit()
-
-
 if __name__ == '__main__':
     storage_method = sys.argv[1]
     print("Started Program")
@@ -290,7 +236,5 @@ if __name__ == '__main__':
         db_url = "https://" + db_name + "-default-rtdb.europe-west1.firebasedatabase.app/cells"
         print("Firebase Database Name: " + db_name + '\n')
         print("Firebase Database URL: " + db_url + '\n')
-
-    #test_firebase()
 
     app.run(host='localhost', port=3000)

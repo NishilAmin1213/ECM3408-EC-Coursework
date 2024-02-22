@@ -57,7 +57,7 @@ def update_cell(cell):
             # the cell already exists, so change the contents of its formula
             cursor.execute('UPDATE SPREADSHEET SET formula=? WHERE id=?', (data['formula'], data['id']))
             connection.commit()
-            # return status 201 (Created)
+            # return status 204 - No Content
             return Response(status=204)
     elif storage_method == 'firebase':
 
@@ -189,7 +189,7 @@ def list_cells():
     try:
         # return an array containing the cells that are in the database
         # This returns code 200 (OK) by default
-        return get_cells()
+        return jsonify(get_cells())
     except Exception:
         # if we get here, there was an issue retrieving cells, return 500
         return Response(status=500)
@@ -231,6 +231,9 @@ if __name__ == '__main__':
         except KeyError:
             print("ERROR: ENV VAR 'FBASE' DOES NOT EXIST")
             quit()
+    else:
+        print("INCORRECT STORAGE METHOD GIVEN - ACCEPTS 'sqlite' or 'firebase' ")
+        quit()
 
         print("Using Storage Method: " + storage_method)
         db_url = "https://" + db_name + "-default-rtdb.europe-west1.firebasedatabase.app/cells"

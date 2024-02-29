@@ -10,10 +10,6 @@ global storage_method, connection, db_name
 app = Flask("ECM3408 Flask Server")
 
 
-class CellNotFoundError(Exception):
-    pass
-
-
 def validate_cell_input(cell):
     return re.match(r"[A-Z]+[0-9]+$", cell)
 
@@ -114,8 +110,8 @@ def evaluate_formula(formula):
             # if this returns 200, then return the formula
             return cell_contents.json['formula']
         else:
-            # if the return code is not 200, then raise a custom error - 'CellNotFoundError'
-            raise CellNotFoundError
+            # if the return code is not 404, then return 0 (as this will be placed into a formula)
+            return "0"
 
     # Replace cell indexes with their values and return the evaluated expression
     clean_formula = re.compile(r'[A-Z]+[0-9]+').sub(evaluate_cell, formula)
@@ -128,34 +124,33 @@ def read_cell(cell):
         # return code 404 (Not Found)
         return Response(status=404)
 
-    try:
-        if storage_method == 'sqlite':
-            cursor = connection.cursor()
+    if storage_method == 'sqlite':
+        cursor = connection.cursor()
 
-            query = cursor.execute('SELECT * FROM SPREADSHEET WHERE id=?', (cell,)).fetchall()
-            if len(query) == 0:
-                # if the length of the query result is 0 then the cell does not exist, return 404
+        query = cursor.execute('SELECT * FROM SPREADSHEET WHERE id=?', (cell,)).fetchall()
+        if len(query) == 0:
+            # if the length of the query result is 0 then the cell does not exist, return 404
+            return Response(status=404)
+        else:
+            # IF THE CELL CONTAINS ANOTHER CELL - WE MUST EVALUATE FORMULA AND REPLACE NON EXISTENT CELLS WITH 0
+            # ELSE - RETURN CELL VALUE AND 404 if it does not exist
+
+            # as the length of the query result is >0 the cell exists, data is retrieved and formula is evaluated
+            # return the id and formula in JSON
+            # This returns code 200 (OK) by default
+            return jsonify(id=query[0][0], formula=evaluate_formula(query[0][1]))
+    elif storage_method == 'firebase':
+
+        response = requests.get(
+            url="https://" + db_name + "-default-rtdb.europe-west1.firebasedatabase.app/cells/" + cell + ".json")
+        if response.status_code == 200:
+            if response.json() == None:
                 return Response(status=404)
             else:
-                # as the length of the query result is >0 the cell exists, data is retrieved and formula is evaluated
-                # return the id and formula in JSON
+                # cell exists and json contains the formula
                 # This returns code 200 (OK) by default
-                return jsonify(id=query[0][0], formula=evaluate_formula(query[0][1]))
-        elif storage_method == 'firebase':
+                return jsonify(id=cell, formula=evaluate_formula(response.json()['formula']))
 
-            response = requests.get(
-                url="https://" + db_name + "-default-rtdb.europe-west1.firebasedatabase.app/cells/" + cell + ".json")
-            if response.status_code == 200:
-                if response.json() == None:
-                    return Response(status=404)
-                else:
-                    # cell exists and json contains the formula
-                    # This returns code 200 (OK) by default
-                    return jsonify(id=cell, formula=evaluate_formula(response.json()['formula']))
-
-    except CellNotFoundError:
-        # A cell which was contained within a formula did not exist, therefore return 404 (Not Found)
-        return Response(status=404)
 
     # the program should not reach this point, if it does, return code 500 (Internal Server Error)
     return Response(status=500)
@@ -249,7 +244,6 @@ if __name__ == '__main__':
     parser.add_argument("-r")
     args = parser.parse_args()
     storage_method = args.r
-    #storage_method = sys.argv[1]
     print("Started Program")
 
     if storage_method == 'sqlite':

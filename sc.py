@@ -114,8 +114,8 @@ def evaluate_formula(formula):
             # if this returns 200, then return the formula
             return cell_contents.json['formula']
         else:
-            # if the return code is not 200, then raise a custom error - 'CellNotFoundError'
-            raise CellNotFoundError
+            # if the return code is not 200, then raise a custom error return 0 (as this will be placed into a formula)
+            return 0
 
     # Replace cell indexes with their values and return the evaluated expression
     clean_formula = re.compile(r'[A-Z]+[0-9]+').sub(evaluate_cell, formula)
@@ -137,10 +137,24 @@ def read_cell(cell):
                 # if the length of the query result is 0 then the cell does not exist, return 404
                 return Response(status=404)
             else:
-                # as the length of the query result is >0 the cell exists, data is retrieved and formula is evaluated
-                # return the id and formula in JSON
-                # This returns code 200 (OK) by default
-                return jsonify(id=query[0][0], formula=evaluate_formula(query[0][1]))
+                # if the formula is a single cell, then retrieve the cell and return its contents, OR return a 404 if the cell does not exist
+                if validate_cell_input(query[0][1]):
+                    # the formula is a single cell, so get the cell value from the database and return it
+                    cell_contents = read_cell(query[0][1])
+
+                    if cell_contents.status_code == 200:
+                        # if this returns 200, then return the formula
+                        return cell_contents.json['formula']
+                    else:
+                        # if the return code is not 200, then return 404
+                        return Response(status=404)
+                else:
+                    # the cell contains a formula and therefore the formula must be evaulated
+                    # return the id and formula in JSON
+                    # This returns code 200 (OK) by default
+                    return jsonify(id=query[0][0], formula=evaluate_formula(query[0][1]))
+
+
         elif storage_method == 'firebase':
 
             response = requests.get(
@@ -249,7 +263,6 @@ if __name__ == '__main__':
     parser.add_argument("-r")
     args = parser.parse_args()
     storage_method = args.r
-    #storage_method = sys.argv[1]
     print("Started Program")
 
     if storage_method == 'sqlite':
@@ -260,7 +273,7 @@ if __name__ == '__main__':
         try:
             db_name = os.environ['FBASE']
             db_url = "https://" + db_name + "-default-rtdb.europe-west1.firebasedatabase.app/cells"
-            clear_firebase()
+            #clear_firebase() # REMEMBER TO UNHASH THIS BEFORE HANDING IN
             print("Using Storage Method: " + storage_method)
             print("Firebase Database Name: " + db_name)
             print("Firebase Database URL: " + db_url + '\n')
